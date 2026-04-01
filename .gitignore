@@ -1,0 +1,6 @@
+secrets/
+wireguard/
+__pycache__/
+db.sqlite
+logs/
+output/
