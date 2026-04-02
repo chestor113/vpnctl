@@ -62,11 +62,11 @@ def handle_create(args):
             'client_ip': wg_ip,
             'server_pub_key': wg_server_pub,
             'endpoint': wg_endpoint,
-            'username': args.username,
+            'telegram': args.telegram,
             'dns': '8.8.8.8'
         }
 
-        dir_name = f'{args.username.replace(" ", "_")}_{user_uuid}'
+        dir_name = f'{args.telegram.replace(" ", "_")}_{user_uuid}'
 
         client_config = wg_config.render_client_config(wg_data)
         config_path = wg_config.save_client_config(client_config, dir_name, 'wg.conf')
@@ -156,19 +156,16 @@ def handle_renew(args):
 
 def handle_disable(args):
     try:
-        if not args.username and not args.telegram:
-            logger.error("Disable failed: no username or telegram provided")
+        if not args.telegram:
+            logger.error("Disable failed: no telegram provided")
             return Result(
                 False,
-                error="Disable failed: no username or telegram provided"
+                error="Disable failed: no telegram provided"
             )
         row = None
         if args.telegram:
             row = db.find_by_telegram(args.telegram)
 
-        if row is None and args.username:
-            row = db.find_by_username(args.username)
-        
         if row is None:
             logger.warning(
                 "User not found: username=%s, telegram=%s",
@@ -180,7 +177,7 @@ def handle_disable(args):
             )
         
         disable_result = db.disable_by_uuid(row['uuid'], 'manual')
-        
+
         server_config = wg_server_config.build_server_config('wireguard/server_base.conf','wireguard/peers')
         server_path_config = wg_server_config.save_wg_server_conf(server_config, 'wg0.conf')
 
