@@ -28,6 +28,7 @@ def get_wg_free_ip(network_mask, taken_ips):
     return None
 
 
-def load_server_public_key(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read().strip()
+# def load_server_public_key(path):
+#     with open(path, "r", encoding="utf-8") as f:
+#         return f.read().strip()
+    

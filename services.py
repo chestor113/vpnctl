@@ -5,9 +5,19 @@ import uuid
 import wg
 import wg_config
 import wg_server_config
-
+import os
+from result import Result
+import config
 
 logger = logging.getLogger(__name__)
+
+
+def map_db_to_config():
+    return [
+        {"id": row["uuid"], "email": row["telegram"] or row["uuid"]}
+        for row in db.get_active_clients()
+    ]
+
 
 def handle_create(args):
     try:
@@ -15,14 +25,16 @@ def handle_create(args):
         wg_keys = wg.gen_wg_keys()
         wg_ip = wg.get_wg_free_ip('10.10.0.0/24', db.get_ip_addresses())
 
+        wg_server_pub = config.get_server_public_key
+
+        wg_endpoint = config.get_endpoint
+
         if wg_ip is None:
-            logger.error("No free WireGuard IP available")
-            return None
+            logger.error("Create failed: no free WireGuard IP available")
+            return Result(False, error="Create failed: no free WireGuard IP available")
 
         created_at = datetime.now(UTC)
         expires_at = created_at + timedelta(days=args.days)
-
-        server_pub = wg.load_server_public_key("secrets/wg_server_public.key")
 
         payload = {
             'uuid': str(user_uuid),
@@ -40,16 +52,16 @@ def handle_create(args):
         
         row_id = db.insert_grant(payload)
         if row_id is None:
-            logging.error("Failed to insert grant into DB")
-            return None
+            logger.error("Create failed: failed to insert grant into DB")
+            return Result(False, error="Create failed: failed to insert grant into DB")
 
         wg_data = {
             'client_pub_key': wg_keys['public_key'],
             'client_pr_key': wg_keys['private_key'],
             'preshared_key': wg_keys['preshared_key'],
-            'client_ip': f'{wg_ip}',
-            'server_pub_key': server_pub,
-            'endpoint': '109.107.175.116:54321',
+            'client_ip': wg_ip,
+            'server_pub_key': wg_server_pub,
+            'endpoint': wg_endpoint,
             'username': args.username,
             'dns': '8.8.8.8'
         }
@@ -65,28 +77,38 @@ def handle_create(args):
         server_config = wg_server_config.build_server_config('wireguard/server_base.conf','wireguard/peers')
         server_path_config = wg_server_config.save_wg_server_conf(server_config, 'wg0.conf')
 
-        logger.info('Created user: uuid: %s, usename: %s, tg: %s, expires_at: %s, wg_ip: %s', str(user_uuid) , args.username, args.telegram, expires_at.strftime("%Y-%m-%d %H:%M:%S"),  wg_ip)
+        logger.info(
+            "Create success: uuid=%s, username=%s, telegram=%s, expires_at=%s, wg_ip=%s",
+            str(user_uuid), args.username, args.telegram,
+            expires_at.strftime("%Y-%m-%d %H:%M:%S"), wg_ip
+        )
 
-        return {
+        return Result(
+        True,
+        data={
         "id": row_id,
         "uuid": str(user_uuid),
         "username": args.username,
         "telegram": args.telegram,
         "expires_at": expires_at.strftime("%Y-%m-%d %H:%M:%S"),
         "wg_ip": wg_ip,
-        "config_path": str(config_path),
-        "peer_path_config": str(peer_path_config),
-        "srv_path_config": str(server_path_config)
-    }
+        "config_path": config_path.as_posix(),
+        "peer_path_config": peer_path_config.as_posix(),
+        "srv_path_config": server_path_config.as_posix()
+        }
+        )
     except Exception:
-        logger.exception('Handle create crashed: username=%s tg: %s', args.username, args.telegram)
-        return None
+        logger.exception('Handle create crashed: username=%s tg: %s',
+        args.username, args.telegram)
+        return Result(False,
+        error=f"Handle create crashed: username={args.username}, telegram={args.telegram}"
+        )
 
 def handle_renew(args):
     try:
         if not args.username and not args.telegram:
-            logger.error("There is no usernamd and telegram, Renew failed")
-            return None
+            logger.error("Renew failed: no username or telegram provided")
+            return Result(False, error="Renew failed: no username or telegram provided")
         row = None
         if args.telegram:
             row = db.find_by_telegram(args.telegram)
@@ -95,22 +117,87 @@ def handle_renew(args):
             row = db.find_by_username(args.username)
         
         if row is None:
-            logger.warning('Username: %s Tg %s is not found', args.username, args.telegram)
-            return None
-        
+            logger.warning(
+                "User not found: username=%s, telegram=%s",
+                args.username, args.telegram
+            )
+            return Result(
+                False,
+                error=f"User not found: username={args.username}, telegram={args.telegram}"
+            )
+            
         renew_result = db.renew_by_uuid(row['uuid'], args.days)
-        if renew_result is None:
-                logger.error("Renew failed in DB: uuid=%s, username=%s",row["uuid"],row["username"])
-                return None
+        if not renew_result:
+                logger.error("Renew failed in DB: uuid=%s, username=%s",
+                row["uuid"],row["username"])
+                return Result(False,
+                    error=f"Renew failed in DB: uuid={row['uuid']}, username={row['username']}"
+                )
 
-        logger.info('Username: %s, Tg: %s, Days to expires_at: %s', row['username'], row['telegram'], args.days)
-        return renew_result
+        logger.info(
+            "Renew success: username=%s, telegram=%s, days=%s",
+            row["username"], row["telegram"], args.days
+        )
+
+        return Result(True,data={
+        "uuid": row["uuid"],
+        "username": row["username"],
+        "telegram": row["telegram"],
+        "days": args.days
+    }
+    )
     except Exception:
-        logger.exception('Handle renew crashed: username=%s tg: %s', args.username, args.telegram)
-        return None
+        logger.exception('Handle renew crashed/ username: %s tg: %s', 
+        args.username, args.telegram)
+        return Result(
+            False,
+            error=f"Handle renew crashed/ username: {args.username} Tg: {args.telegram}"
+            )
 
-def map_db_to_config():
-    return [
-        {"id": row["uuid"], "email": row["telegram"] or row["uuid"]}
-        for row in db.get_active_clients()
-    ]
+def handle_disable(args):
+    try:
+        if not args.username and not args.telegram:
+            logger.error("Disable failed: no username or telegram provided")
+            return Result(
+                False,
+                error="Disable failed: no username or telegram provided"
+            )
+        row = None
+        if args.telegram:
+            row = db.find_by_telegram(args.telegram)
+
+        if row is None and args.username:
+            row = db.find_by_username(args.username)
+        
+        if row is None:
+            logger.warning(
+                "User not found: username=%s, telegram=%s",
+                args.username, args.telegram
+            )
+            return Result(
+                False,
+                error=f"User not found: username={args.username}, telegram={args.telegram}"
+            )
+        
+        disable_result = db.disable_by_uuid(row['uuid'], 'manual')
+        
+        server_config = wg_server_config.build_server_config('wireguard/server_base.conf','wireguard/peers')
+        server_path_config = wg_server_config.save_wg_server_conf(server_config, 'wg0.conf')
+
+        print(disable_result)
+        if not disable_result:
+            logger.error("Disable is failed. username: %s, tg: %s", args.username, args.telegram)
+            return Result(
+                False,
+                error=f"Disable failed in DB: username={args.username}, telegram={args.telegram}"
+            )
+        logger.info('Disabled username: %s, tg: %s', row['username'], row['telegram'])
+
+        updated_result = db.find_by_uuid(row['uuid'])
+
+        return Result(disable_result, data=updated_result)
+    
+    except Exception:
+        logger.exception('Disable gone wrong. username: %s tg: %s',
+        args.username, args.telegram)
+        return Result(False, error="Unexpected error during disable")

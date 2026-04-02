@@ -17,13 +17,19 @@ def build_parser():
 
     #renew command
     renew_parser = subparsers.add_parser("renew", help = 'Продлить доступ')
+
     renew_parser.add_argument("-u", "--username", help="Имя пользователя")
     renew_parser.add_argument("-t", "--telegram", help="Telegram username")
     renew_parser.add_argument("-d", "--days", type=int, default=180, help="Количество дней")
 
     renew_parser.set_defaults(handler=services.handle_renew)
 
+    #disable user
+    disable_parser = subparsers.add_parser("disable", help = "Выключить юзера")
 
+    disable_parser.add_argument("-u", "--username", help="Имя пользователя")
+    disable_parser.add_argument("-t", "--telegram", help="Telegram username")
 
+    disable_parser.set_defaults(handler=services.handle_disable)
 
     return parser
