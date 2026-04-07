@@ -10,8 +10,34 @@ from result import Result
 import config
 
 logger = logging.getLogger(__name__)
+# Helpers functions
+
+# Helper finder of user by telegram
+def get_user_by_telegram(tg: str):
+    if not tg:
+        logger.error("Telegram is required")
+        return Result(False, error="Telegram is required")
+
+    row = db.find_by_telegram(tg)
+
+    if row is None:
+        logger.warning("User not found: telegram=%s", tg)
+        return Result(False, error=f"User not found: telegram={tg}")
+
+    return Result(True, data=row)
 
 
+#Helpder function to rebuild configuration of WG server
+def rebuild_server_wg_config():
+        try:
+            server_config = wg_server_config.build_server_config('wireguard/server_base.conf','wireguard/peers')
+            path_config = wg_server_config.save_wg_server_conf(server_config, 'wg0.conf')
+            return Result(True, data={"srv_path_config": path_config.as_posix()})
+        except Exception:
+            logger.exception('Cant rebuild WG server config')
+            return Result(False, error='Failed to rebuild server config')
+
+#Helper function of mapping from db to real
 def map_db_to_config():
     return [
         {"id": row["uuid"], "email": row["telegram"] or row["uuid"]}
@@ -25,9 +51,9 @@ def handle_create(args):
         wg_keys = wg.gen_wg_keys()
         wg_ip = wg.get_wg_free_ip('10.10.0.0/24', db.get_ip_addresses())
 
-        wg_server_pub = config.get_server_public_key
+        wg_server_pub = config.get_server_public_key()
 
-        wg_endpoint = config.get_endpoint
+        wg_endpoint = config.get_endpoint()
 
         if wg_ip is None:
             logger.error("Create failed: no free WireGuard IP available")
@@ -74,8 +100,9 @@ def handle_create(args):
         peer_config = wg_config.render_server_peer(wg_data)
         peer_path_config = wg_config.save_peer_config(peer_config, dir_name, 'peer.conf')
 
-        server_config = wg_server_config.build_server_config('wireguard/server_base.conf','wireguard/peers')
-        server_path_config = wg_server_config.save_wg_server_conf(server_config, 'wg0.conf')
+        config_result = rebuild_server_wg_config()
+        if not config_result:
+            return config_result
 
         logger.info(
             "Create success: uuid=%s, username=%s, telegram=%s, expires_at=%s, wg_ip=%s",
@@ -94,7 +121,7 @@ def handle_create(args):
         "wg_ip": wg_ip,
         "config_path": config_path.as_posix(),
         "peer_path_config": peer_path_config.as_posix(),
-        "srv_path_config": server_path_config.as_posix()
+        "srv_path_config": config_result.data["srv_path_config"]
         }
         )
     except Exception:
@@ -106,25 +133,11 @@ def handle_create(args):
 
 def handle_renew(args):
     try:
-        if not args.username and not args.telegram:
-            logger.error("Renew failed: no username or telegram provided")
-            return Result(False, error="Renew failed: no username or telegram provided")
-        row = None
-        if args.telegram:
-            row = db.find_by_telegram(args.telegram)
-
-        if row is None and args.username:
-            row = db.find_by_username(args.username)
+        user_result = get_user_by_telegram(args.telegram)
+        if not user_result:
+            return user_result
         
-        if row is None:
-            logger.warning(
-                "User not found: username=%s, telegram=%s",
-                args.username, args.telegram
-            )
-            return Result(
-                False,
-                error=f"User not found: username={args.username}, telegram={args.telegram}"
-            )
+        row = user_result.data
             
         renew_result = db.renew_by_uuid(row['uuid'], args.days)
         if not renew_result:
@@ -147,41 +160,22 @@ def handle_renew(args):
     }
     )
     except Exception:
-        logger.exception('Handle renew crashed/ username: %s tg: %s', 
+        logger.exception('Handle renew crashed username: %s tg: %s', 
         args.username, args.telegram)
         return Result(
             False,
-            error=f"Handle renew crashed/ username: {args.username} Tg: {args.telegram}"
+            error=f"Handle renew crashed username: {args.username} Tg: {args.telegram}"
             )
 
 def handle_disable(args):
     try:
-        if not args.telegram:
-            logger.error("Disable failed: no telegram provided")
-            return Result(
-                False,
-                error="Disable failed: no telegram provided"
-            )
-        row = None
-        if args.telegram:
-            row = db.find_by_telegram(args.telegram)
-
-        if row is None:
-            logger.warning(
-                "User not found: username=%s, telegram=%s",
-                args.username, args.telegram
-            )
-            return Result(
-                False,
-                error=f"User not found: username={args.username}, telegram={args.telegram}"
-            )
+        user_result = get_user_by_telegram(args.telegram)
+        if not user_result:
+            return user_result
+        row = user_result.data
         
         disable_result = db.disable_by_uuid(row['uuid'], 'manual')
 
-        server_config = wg_server_config.build_server_config('wireguard/server_base.conf','wireguard/peers')
-        server_path_config = wg_server_config.save_wg_server_conf(server_config, 'wg0.conf')
-
-        print(disable_result)
         if not disable_result:
             logger.error("Disable is failed. username: %s, tg: %s", args.username, args.telegram)
             return Result(
@@ -190,11 +184,46 @@ def handle_disable(args):
             )
         logger.info('Disabled username: %s, tg: %s', row['username'], row['telegram'])
 
+        config_result = rebuild_server_wg_config()
+        if not config_result:
+            return config_result        
+
         updated_result = db.find_by_uuid(row['uuid'])
 
-        return Result(disable_result, data=updated_result)
+        return Result(disable_result, data={**updated_result, "srv_path_config": config_result.data["srv_path_config"]})
     
     except Exception:
         logger.exception('Disable gone wrong. username: %s tg: %s',
         args.username, args.telegram)
         return Result(False, error="Unexpected error during disable")
+    
+
+def handle_enable(args):
+    try:
+        user_result = get_user_by_telegram(args.telegram)
+        if not user_result:
+            return user_result
+        row = user_result.data
+
+        enable_result = db.enable_by_uuid(row['uuid'])
+
+        if not enable_result:
+            logger.error("Enable is failed. username: %s, tg: %s", args.username, args.telegram)
+            return Result(
+                False,
+                error=f"Enable failed in DB: username={args.username}, telegram={args.telegram}"
+            )
+        logger.info('Enable username: %s, tg: %s', row['username'], row['telegram'])
+
+        config_result = rebuild_server_wg_config()
+        if not config_result:
+            return config_result
+
+        updated_result = db.find_by_uuid(row['uuid'])
+        
+        return Result(enable_result, data={**updated_result, "srv_path_config":config_result.data["srv_path_config"]})
+
+    except Exception:
+        logger.exception('Enable gone wrong. username: %s tg: %s',
+        args.username, args.telegram)
+        return Result(False, error="Unexpected error during enable")

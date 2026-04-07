@@ -32,4 +32,14 @@ def build_parser():
 
     disable_parser.set_defaults(handler=services.handle_disable)
 
+    #enable user
+    enable_parser = subparsers.add_parser("enable", help = "Включить юзера")
+
+    # disable_parser.add_argument("-u", "--username", help="Имя пользователя")
+    enable_parser.add_argument("-t", "--telegram", help="Telegram username")
+
+    enable_parser.set_defaults(handler=services.handle_disable)
+
+
+
     return parser
