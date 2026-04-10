@@ -9,7 +9,7 @@ def build_server_config(base_config_path, peers_dir):
     peers_base = Path(peers_dir)
     result = [base_config]
 
-    active_clients = db.get_active_clients()
+    active_clients = db.get_uuid_active_clients()
 
     for peer in sorted(peers_base.iterdir()):
         if not peer.is_dir():

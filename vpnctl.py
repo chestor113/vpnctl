@@ -3,13 +3,31 @@ import cli
 from logger_config import setup_logging
 from pathlib import Path
 
-
 logger = logging.getLogger(__name__)
 
 
-def print_result_data(data: dict):
-    for key, value in data.items():
-        print(f"{key}: {value}")
+
+def print_result_data(data):
+    if isinstance(data, dict):
+        for key, value in data.items():
+            print(f"{key}: {value}")
+        return
+
+    if isinstance(data, list):
+        if not data:
+            print("No data")
+            return
+
+        if isinstance(data[0], dict):
+            for user in data:
+                print(user)
+            return
+
+        for item in data:
+            print(item)
+        return
+
+    print(data)
 
 
 def main():
@@ -27,6 +45,7 @@ def main():
 
     if result.data:
         print_result_data(result.data)
+
 
     logger.info("Operation completed successfully")
 

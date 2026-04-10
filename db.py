@@ -84,7 +84,41 @@ def renew_by_uuid(uuid, days):
             logger.info("Error: %s", e)
             return False
         
-def get_active_clients():
+
+def get_all_clients():
+    with sqlite3.connect("db.sqlite") as conn:
+        conn.row_factory = sqlite3.Row
+        try:
+            now = datetime.now(UTC)
+            rows = conn.execute(
+                """select id, uuid, username, telegram, is_enabled, created_at, expires_at, access_tag, turned_off_reason, turned_off_at from access_grants"""
+            ).fetchall()
+            if not rows:
+                return []
+            return [dict(row) for row in rows]
+        
+        except sqlite3.Error as e:
+            logger.info("Error: %s", e)
+            return []
+        
+
+def get_all_active_clients():
+    with sqlite3.connect("db.sqlite") as conn:
+        conn.row_factory = sqlite3.Row
+        try:
+            now = datetime.now(UTC)
+            rows = conn.execute(
+                """select uuid, username, telegram, access_tag, expires_at from access_grants where is_enabled = 1"""
+            ).fetchall()
+            if not rows:
+                return []
+            return [dict(row) for row in rows]
+        
+        except sqlite3.Error as e:
+            logger.info("Error: %s", e)
+            return []
+
+def get_uuid_active_clients():
     with sqlite3.connect("db.sqlite") as conn:
         conn.row_factory = sqlite3.Row
         try:
@@ -95,6 +129,22 @@ def get_active_clients():
             if not rows:
                 return []
             return [row['uuid'] for row in rows]
+        
+        except sqlite3.Error as e:
+            logger.info("Error: %s", e)
+            return []
+        
+def get_inactive_clients():
+    with sqlite3.connect("db.sqlite") as conn:
+        conn.row_factory = sqlite3.Row
+        try:
+            now = datetime.now(UTC)
+            rows = conn.execute(
+                """select uuid, username, telegram, expires_at, turned_off_reason, turned_off_at, is_enabled  from access_grants where is_enabled = 0;"""
+            ).fetchall()
+            if not rows:
+                return []
+            return [dict(row) for row in rows]
         
         except sqlite3.Error as e:
             logger.info("Error: %s", e)

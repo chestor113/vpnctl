@@ -40,6 +40,14 @@ def build_parser():
 
     enable_parser.set_defaults(handler=services.handle_disable)
 
+    #list user
+    enable_parser = subparsers.add_parser("list", help = "Вывести список юзеров")
+
+    enable_parser.add_argument("--all", action="store_true", help="List all")
+    enable_parser.add_argument("-a", "--active", action="store_true", help="List all active")
+    enable_parser.add_argument("-i", "--inactive", action="store_true", help="List all inactive")
+
+    enable_parser.set_defaults(handler=services.handle_list)
 
 
     return parser

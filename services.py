@@ -47,6 +47,11 @@ def map_db_to_config():
 
 def handle_create(args):
     try:
+        check_unique = db.find_by_telegram(args.telegram)
+        if check_unique:
+            logger.error("Users already exists with tg = %s", args.telegram)
+            return Result(False, error="Users already exists")
+        
         user_uuid = uuid.uuid4()
         wg_keys = wg.gen_wg_keys()
         wg_ip = wg.get_wg_free_ip('10.10.0.0/24', db.get_ip_addresses())
@@ -227,3 +232,29 @@ def handle_enable(args):
         logger.exception('Enable gone wrong. username: %s tg: %s',
         args.username, args.telegram)
         return Result(False, error="Unexpected error during enable")
+    
+
+def handle_list(args):
+    try:
+        if args.all:
+            users = db.get_all_clients()
+        elif args.active:
+            users = db.get_all_active_clients()
+        elif args.inactive:
+            users = db.get_inactive_clients()
+        else:
+            users = db.get_all_clients()
+
+        if not users:
+            logger.info("List returned no users")
+            return Result(True, data=[])
+
+        return Result(
+            True,
+            data=users
+        )
+    except Exception:
+        logger.exception('List gone wrong')
+        return Result(False, error="Unexpected error during listing")
+    
+
