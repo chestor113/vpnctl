@@ -13,9 +13,10 @@ import shutil
 
 
 logger = logging.getLogger(__name__)
-# Helpers functions
 
-# Helper finder of user by telegram
+# ФУНКЦИИ ПОМОШНИКИ
+
+# ПОМОГАЕТ ПО ТЕЛЕГРАМУ ИСКАТЬ, ЧТОБЫ НЕ ПИСАТЬ ПО 9 СТРОК В КАЖДОЙ ФУНКЦИИ
 def get_user_by_telegram(tg: str):
     if not tg:
         logger.error("Telegram is required")
@@ -30,7 +31,7 @@ def get_user_by_telegram(tg: str):
     return Result(True, data=row)
 
 
-#Helpder function to rebuild configuration of WG server
+# ФУНКЦИЯ ДЛЯ ТОГО ЧТОБЫ ПЕРЕСОБРАТЬ КОНФИГУ ПОСЛЕ УДАЛЕНИЯ ИЛИ ИЗМЕНЕНИЯ
 def rebuild_server_wg_config():
         try:
             server_config = wg_server_config.build_server_config('wireguard/server_base.conf','wireguard/peers')
@@ -44,7 +45,7 @@ def rebuild_server_wg_config():
 
 
 
-#Helper function of mapping from db to real
+# ПОМОШНИК ДЛЯ МАППИНГА
 def map_db_to_config():
     return [
         {"id": row["uuid"], "email": row["telegram"] or row["uuid"]}
@@ -168,8 +169,10 @@ def handle_disable(args):
         config_result = rebuild_server_wg_config()
         
         if not config_result:
-            return config_result        
+            return config_result
+          
         deploy_result = deploy.deploy_server_config()
+
         if not deploy_result:
             return deploy_result
         
@@ -286,8 +289,14 @@ def handle_delete(args):
         if not row:
             return Result(False, error="User not found")
        
+        delete_result = db.delete_user(args.telegram)
 
+        if not delete_result:
+            return Result(False,error="User not found or already deleted")
         
+        print(delete_result)
+
+        #Удаляем пир папку после того как удалили из БД
         peers = Path("wireguard/peers")
 
         for peer in peers.iterdir():
@@ -302,14 +311,18 @@ def handle_delete(args):
 
             if peer_uuid == row['uuid']:
                 shutil.rmtree(peer,  ignore_errors=True)
-                
                 break
 
-        delete_result = db.delete_user(args.telegram)
-        if not delete_result:
-            return Result(False,error="User not found or already deleted")
+
+        config_result = rebuild_server_wg_config()
         
-        print(delete_result)
+        if not config_result:
+            return config_result
+        
+        deploy_result = deploy.deploy_server_config()
+
+        if not deploy_result:
+            return deploy_result
 
         return Result(True, data="User deleted successfully")
 
