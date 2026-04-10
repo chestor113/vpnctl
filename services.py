@@ -8,6 +8,9 @@ import wg_server_config
 from result import Result
 import config
 import deploy
+from pathlib import Path
+import shutil
+
 
 logger = logging.getLogger(__name__)
 # Helpers functions
@@ -277,3 +280,39 @@ def handle_list(args):
         return Result(False, error="Unexpected error during listing")
     
 
+def handle_delete(args):
+    try:
+        row = db.find_by_telegram(args.telegram)
+        if not row:
+            return Result(False, error="User not found")
+       
+
+        
+        peers = Path("wireguard/peers")
+
+        for peer in peers.iterdir():
+            if not peer.is_dir():
+                continue
+            parts = peer.name.split("_")
+        
+            if len(parts) < 2:
+                logger.warning("Invalid peer folder name: %s", peer.name)
+                continue
+            peer_uuid = parts[-1]
+
+            if peer_uuid == row['uuid']:
+                shutil.rmtree(peer,  ignore_errors=True)
+                
+                break
+
+        delete_result = db.delete_user(args.telegram)
+        if not delete_result:
+            return Result(False,error="User not found or already deleted")
+        
+        print(delete_result)
+
+        return Result(True, data="User deleted successfully")
+
+    except Exception:
+        logger.exception("Deleting telegram=%s gone wrong", args.telegram)
+        return Result(False, error="Deleting gone wrong")

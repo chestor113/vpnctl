@@ -186,3 +186,17 @@ def get_ip_addresses():
         except sqlite3.Error as e:
             logger.info("Error: %s", e)
             return []
+        
+def delete_user(telegram):
+    with sqlite3.connect("db.sqlite") as conn:
+        try:
+            cursor = conn.execute(
+                "DELETE FROM access_grants WHERE telegram=?",
+                (telegram,)
+            )
+
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error("DB error: %s", e)
+            return False

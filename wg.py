@@ -27,5 +27,3 @@ def get_wg_free_ip(network_mask, taken_ips):
             return ip_str
     return None
 
-
-    

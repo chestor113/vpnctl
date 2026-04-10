@@ -41,13 +41,19 @@ def build_parser():
     enable_parser.set_defaults(handler=services.handle_enable)
 
     #list user
-    enable_parser = subparsers.add_parser("list", help = "Вывести список юзеров")
+    list_parser = subparsers.add_parser("list", help = "Вывести список юзеров")
 
-    enable_parser.add_argument("--all", action="store_true", help="Выводит всех пользователей")
-    enable_parser.add_argument("-a", "--active", action="store_true", help="Выводит всех активных")
-    enable_parser.add_argument("-i", "--inactive", action="store_true", help="Выводит всех неактивных")
+    list_parser.add_argument("--all", action="store_true", help="Выводит всех пользователей")
+    list_parser.add_argument("-a", "--active", action="store_true", help="Выводит всех активных")
+    list_parser.add_argument("-i", "--inactive", action="store_true", help="Выводит всех неактивных")
 
-    enable_parser.set_defaults(handler=services.handle_list)
+    list_parser.set_defaults(handler=services.handle_list)
 
+    #delete user
+    delete_parser = subparsers.add_parser("delete", help = "Вывести список юзеров")
+
+    delete_parser.add_argument("-t", "--telegram", help="Telegram пользователя")
+
+    delete_parser.set_defaults(handler=services.handle_delete)
 
     return parser
