@@ -10,9 +10,12 @@
 В качестве источника правды используется SQLLite.   
 В БД хранятся различные атрибуты(uuid, username, telegram, is_enabled, expires_at и другие)  
 На настоящий момент реализованы команды:  
-- Create -u --username username -t --telegram telegram -d --days --tag  
-- Renew -t --telegram -d --days   
-- Disable -t --telegram  
+- create -u --username username -t --telegram telegram -d --days --tag  
+- renew -t --telegram -d --days   
+- disable -t --telegram  
+- enable -t --telegram 
+- list --all (Выводит всех пользователей) -a (Выводит только активных) -i (Выводит только выключенных)
+
 Файлы конфигурации юзеров и сервера хранятся в папке Wireguard/ 
 
 В планах автоматизировать выключение истекших ВПН пользователей по расписанию.  

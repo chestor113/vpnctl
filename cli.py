@@ -36,16 +36,16 @@ def build_parser():
     enable_parser = subparsers.add_parser("enable", help = "Включить юзера")
 
     # disable_parser.add_argument("-u", "--username", help="Имя пользователя")
-    enable_parser.add_argument("-t", "--telegram", help="Telegram username")
+    enable_parser.add_argument("-t", "--telegram", help="Telegram пользователя")
 
-    enable_parser.set_defaults(handler=services.handle_disable)
+    enable_parser.set_defaults(handler=services.handle_enable)
 
     #list user
     enable_parser = subparsers.add_parser("list", help = "Вывести список юзеров")
 
-    enable_parser.add_argument("--all", action="store_true", help="List all")
-    enable_parser.add_argument("-a", "--active", action="store_true", help="List all active")
-    enable_parser.add_argument("-i", "--inactive", action="store_true", help="List all inactive")
+    enable_parser.add_argument("--all", action="store_true", help="Выводит всех пользователей")
+    enable_parser.add_argument("-a", "--active", action="store_true", help="Выводит всех активных")
+    enable_parser.add_argument("-i", "--inactive", action="store_true", help="Выводит всех неактивных")
 
     enable_parser.set_defaults(handler=services.handle_list)
 

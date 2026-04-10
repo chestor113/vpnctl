@@ -5,9 +5,9 @@ import uuid
 import wg
 import wg_config
 import wg_server_config
-import os
 from result import Result
 import config
+
 
 logger = logging.getLogger(__name__)
 # Helpers functions
@@ -36,6 +36,10 @@ def rebuild_server_wg_config():
         except Exception:
             logger.exception('Cant rebuild WG server config')
             return Result(False, error='Failed to rebuild server config')
+
+
+
+
 
 #Helper function of mapping from db to real
 def map_db_to_config():
@@ -208,6 +212,7 @@ def handle_enable(args):
         user_result = get_user_by_telegram(args.telegram)
         if not user_result:
             return user_result
+        
         row = user_result.data
 
         enable_result = db.enable_by_uuid(row['uuid'])

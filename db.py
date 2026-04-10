@@ -9,7 +9,7 @@ def find_by_uuid(uuid):
     with sqlite3.connect("db.sqlite") as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        row = cursor.execute("select * from access_grants where uuid=?", (uuid,)).fetchone()
+        row = cursor.execute("""select uuid, username, telegram, created_at, expires_at, is_enabled, access_tag from access_grants where uuid=?""", (uuid,)).fetchone()
         if not row:
             return None
         return dict(row)
