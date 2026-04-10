@@ -4,7 +4,7 @@ from result import Result
 
 logger = logging.getLogger(__name__)
 
-def deploy_server_config():
+def deploy_server_config() -> Result:
     try:
         completed = subprocess.run(
             ['bash', 'scripts/deploy_wg_config.sh'],

@@ -7,7 +7,7 @@ import wg_config
 import wg_server_config
 from result import Result
 import config
-
+import deploy
 
 logger = logging.getLogger(__name__)
 # Helpers functions
@@ -113,6 +113,10 @@ def handle_create(args):
         if not config_result:
             return config_result
 
+        deploy_result = deploy.deploy_server_config()
+        if not deploy_result:
+            return deploy_result
+
         logger.info(
             "Create success: uuid=%s, username=%s, telegram=%s, expires_at=%s, wg_ip=%s",
             str(user_uuid), args.username, args.telegram,
@@ -139,6 +143,78 @@ def handle_create(args):
         return Result(False,
         error=f"Handle create crashed: username={args.username}, telegram={args.telegram}"
         )
+
+
+def handle_disable(args):
+    try:
+        user_result = get_user_by_telegram(args.telegram)
+        if not user_result:
+            return user_result
+        row = user_result.data
+        
+        disable_result = db.disable_by_uuid(row['uuid'], 'manual')
+
+        if not disable_result:
+            logger.error("Disable is failed. username: %s, tg: %s", args.username, args.telegram)
+            return Result(
+                False,
+                error=f"Disable failed in DB: username={args.username}, telegram={args.telegram}"
+            )
+        logger.info('Disabled username: %s, tg: %s', row['username'], row['telegram'])
+
+        config_result = rebuild_server_wg_config()
+        
+        if not config_result:
+            return config_result        
+        deploy_result = deploy.deploy_server_config()
+        if not deploy_result:
+            return deploy_result
+        
+        updated_result = db.find_by_uuid(row['uuid'])
+
+        return Result(disable_result, data={**updated_result, "srv_path_config": config_result.data["srv_path_config"], **deploy_result.data})
+    
+    except Exception:
+        logger.exception('Disable gone wrong. username: %s tg: %s',
+        args.username, args.telegram)
+        return Result(False, error="Unexpected error during disable")
+    
+
+def handle_enable(args):
+    try:
+        user_result = get_user_by_telegram(args.telegram)
+        if not user_result:
+            return user_result
+        
+        row = user_result.data
+
+        enable_result = db.enable_by_uuid(row['uuid'])
+
+        if not enable_result:
+            logger.error("Enable is failed. username: %s, tg: %s", args.username, args.telegram)
+            return Result(
+                False,
+                error=f"Enable failed in DB: username={args.username}, telegram={args.telegram}"
+            )
+        logger.info('Enable username: %s, tg: %s', row['username'], row['telegram'])
+
+        config_result = rebuild_server_wg_config()
+
+        if not config_result:
+            return config_result
+        
+        deploy_result = deploy.deploy_server_config()
+        if not deploy_result:
+            return deploy_result
+        updated_result = db.find_by_uuid(row['uuid'])
+        
+        return Result(enable_result, data={**updated_result, "srv_path_config":config_result.data["srv_path_config"], **deploy_result.data})
+
+    except Exception:
+        logger.exception('Enable gone wrong. username: %s tg: %s',
+        args.username, args.telegram)
+        return Result(False, error="Unexpected error during enable")
+    
 
 def handle_renew(args):
     try:
@@ -176,68 +252,6 @@ def handle_renew(args):
             error=f"Handle renew crashed username: {args.username} Tg: {args.telegram}"
             )
 
-def handle_disable(args):
-    try:
-        user_result = get_user_by_telegram(args.telegram)
-        if not user_result:
-            return user_result
-        row = user_result.data
-        
-        disable_result = db.disable_by_uuid(row['uuid'], 'manual')
-
-        if not disable_result:
-            logger.error("Disable is failed. username: %s, tg: %s", args.username, args.telegram)
-            return Result(
-                False,
-                error=f"Disable failed in DB: username={args.username}, telegram={args.telegram}"
-            )
-        logger.info('Disabled username: %s, tg: %s', row['username'], row['telegram'])
-
-        config_result = rebuild_server_wg_config()
-        if not config_result:
-            return config_result        
-
-        updated_result = db.find_by_uuid(row['uuid'])
-
-        return Result(disable_result, data={**updated_result, "srv_path_config": config_result.data["srv_path_config"]})
-    
-    except Exception:
-        logger.exception('Disable gone wrong. username: %s tg: %s',
-        args.username, args.telegram)
-        return Result(False, error="Unexpected error during disable")
-    
-
-def handle_enable(args):
-    try:
-        user_result = get_user_by_telegram(args.telegram)
-        if not user_result:
-            return user_result
-        
-        row = user_result.data
-
-        enable_result = db.enable_by_uuid(row['uuid'])
-
-        if not enable_result:
-            logger.error("Enable is failed. username: %s, tg: %s", args.username, args.telegram)
-            return Result(
-                False,
-                error=f"Enable failed in DB: username={args.username}, telegram={args.telegram}"
-            )
-        logger.info('Enable username: %s, tg: %s', row['username'], row['telegram'])
-
-        config_result = rebuild_server_wg_config()
-        if not config_result:
-            return config_result
-
-        updated_result = db.find_by_uuid(row['uuid'])
-        
-        return Result(enable_result, data={**updated_result, "srv_path_config":config_result.data["srv_path_config"]})
-
-    except Exception:
-        logger.exception('Enable gone wrong. username: %s tg: %s',
-        args.username, args.telegram)
-        return Result(False, error="Unexpected error during enable")
-    
 
 def handle_list(args):
     try:
