@@ -178,7 +178,10 @@ def handle_disable(args):
         
         updated_result = db.find_by_uuid(row['uuid'])
 
-        return Result(disable_result, data={**updated_result, "srv_path_config": config_result.data["srv_path_config"], **deploy_result.data})
+        return Result(disable_result, 
+                    data={**updated_result,
+                        "srv_path_config": config_result.data["srv_path_config"],
+                        **deploy_result.data})
     
     except Exception:
         logger.exception('Disable gone wrong. username: %s tg: %s',
@@ -329,3 +332,36 @@ def handle_delete(args):
     except Exception:
         logger.exception("Deleting telegram=%s gone wrong", args.telegram)
         return Result(False, error="Deleting gone wrong")
+    
+def handle_expired(args):
+    try:
+        expired_uuids = db.expire_job()
+
+        if not expired_uuids:
+            logger.info("List returned no users")
+            return Result(True, data=[])
+
+
+        config_result = rebuild_server_wg_config()
+
+        if not config_result:
+            return config_result
+        
+        deploy_result = deploy.deploy_server_config()
+
+        if not deploy_result:
+            return deploy_result
+
+        return Result(
+            True,
+            data={
+                "expired_users": expired_uuids,
+                "srv_path_config": config_result.data["srv_path_config"],
+                **deploy_result.data
+            }
+        )
+    
+    except Exception:
+        logger.exception('List gone wrong')
+        return Result(False, error="Unexpected error during listing")
+    

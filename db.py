@@ -157,7 +157,8 @@ def get_expired_uuids():
             now = datetime.now(UTC)
 
             rows = conn.execute(
-                """select uuid from access_grants where  (expires_at < ? and is_enabled = 1) and access_tag != 'vip';""", (now.strftime("%Y-%m-%d %H:%M:%S"),)
+                """select uuid from access_grants where  (expires_at < ? and is_enabled = 1) and access_tag != 'vip';""",
+                 (now.strftime("%Y-%m-%d %H:%M:%S"),)
             ).fetchall()
 
             return [row[0] for row in rows]

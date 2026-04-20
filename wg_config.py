@@ -24,9 +24,10 @@ def save_client_config(config_text, dir_name, filename):
 
 def render_server_peer(data):
     result = f"""[Peer]
-#{data['telegram']}
+# friendly_name={data['telegram']}
 PublicKey = {data['client_pub_key']}
 AllowedIPs = {data['client_ip']}/32
+
 """
     return result
 

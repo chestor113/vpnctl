@@ -56,4 +56,10 @@ def build_parser():
 
     delete_parser.set_defaults(handler=services.handle_delete)
 
+
+    
+    #expired user
+    expired_parser = subparsers.add_parser("expire", help = "Выключение тех у кого истек срок")
+    expired_parser.set_defaults(handler=services.handle_expired)
+
     return parser
